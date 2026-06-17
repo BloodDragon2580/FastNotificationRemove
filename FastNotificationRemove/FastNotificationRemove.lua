@@ -173,20 +173,16 @@ local function HideCategoryBadge(button)
     end
 end
 
-local function MarkAllSettingsSeen()
-    if type(NewSettings) ~= "table" or type(NewSettingsSeen) ~= "table" then
-        dprint("NewSettings or NewSettingsSeen not available yet.")
-        return
-    end
+-- Midnight 12.x is much stricter about taint/secret values.
+-- Do NOT write into Blizzard globals like NewSettingsSeen here.
+-- We only hide the visual badges after Blizzard has built/refreshed them.
+local function CanTouchVisualUI()
+    return not InCombatLockdown()
+end
 
-    for _, settingsGroup in pairs(NewSettings) do
-        if type(settingsGroup) == "table" then
-            for _, newSetting in ipairs(settingsGroup) do
-                if newSetting and not NewSettingsSeen[newSetting] then
-                    NewSettingsSeen[newSetting] = true
-                end
-            end
-        end
+local function HideVisualFrame(frame)
+    if frame and CanTouchVisualUI() then
+        frame:Hide()
     end
 end
 
@@ -220,7 +216,9 @@ function FastNotificationRemove:RemoveSettingsNotifications()
         return
     end
 
-    MarkAllSettingsSeen()
+    if not CanTouchVisualUI() then
+        return
+    end
 
     if SettingsPanel and SettingsPanel.CategoryList and SettingsPanel.CategoryList.CategoryButtons then
         for button in pairs(SettingsPanel.CategoryList.CategoryButtons) do
@@ -230,11 +228,26 @@ function FastNotificationRemove:RemoveSettingsNotifications()
 
     if SettingsCategoryListButtonMixin and not self._hookedCategoryButtonMixin then
         hooksecurefunc(SettingsCategoryListButtonMixin, "RefreshNewFeature", function(button)
-            if FastNotificationRemove.db and FastNotificationRemove.db.profile.removeSettingsBadges then
+            if FastNotificationRemove.db and FastNotificationRemove.db.profile.removeSettingsBadges and CanTouchVisualUI() then
                 HideCategoryBadge(button)
             end
         end)
         self._hookedCategoryButtonMixin = true
+    end
+
+    -- Hide the NEW marker on the ESC/Game Menu after Blizzard refreshes its buttons.
+    -- Important: we do not change CurrentVersionHasNewUnseenSettings() data anymore.
+    if GameMenuFrameMixin and not self._hookedGameMenuMixin then
+        hooksecurefunc(GameMenuFrameMixin, "InitButtons", function(menu)
+            if FastNotificationRemove.db and FastNotificationRemove.db.profile.removeSettingsBadges and CanTouchVisualUI() then
+                HideVisualFrame(menu and menu.NewOptionsFrame)
+            end
+        end)
+        self._hookedGameMenuMixin = true
+    end
+
+    if GameMenuFrame then
+        HideVisualFrame(GameMenuFrame.NewOptionsFrame)
     end
 end
 
@@ -243,13 +256,27 @@ function FastNotificationRemove:RemoveMicroMenuNotifications()
         return
     end
 
+    if not CanTouchVisualUI() then
+        return
+    end
+
     if MainMenuMicroButton then
-        if MainMenuMicroButton.Alert then
-            MainMenuMicroButton.Alert:Hide()
-        end
-        if MainMenuMicroButton.NotificationOverlay then
-            MainMenuMicroButton.NotificationOverlay:Hide()
-        end
+        HideVisualFrame(MainMenuMicroButton.Alert)
+        HideVisualFrame(MainMenuMicroButton.NotificationOverlay)
+    end
+
+    if type(UpdateMicroButtons) == "function" and not self._hookedUpdateMicroButtons then
+        hooksecurefunc("UpdateMicroButtons", function()
+            if FastNotificationRemove.db and FastNotificationRemove.db.profile.removeMicroMenuNotifications then
+                C_Timer.After(0, function()
+                    if MainMenuMicroButton and CanTouchVisualUI() then
+                        HideVisualFrame(MainMenuMicroButton.Alert)
+                        HideVisualFrame(MainMenuMicroButton.NotificationOverlay)
+                    end
+                end)
+            end
+        end)
+        self._hookedUpdateMicroButtons = true
     end
 end
 
