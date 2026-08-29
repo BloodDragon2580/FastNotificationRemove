@@ -2,7 +2,7 @@
 ## Title: |cffd6266cFastNotificationRemove|r
 ## Notes: Removes NEW badges and menu notifications automatically.
 ## Author: BloodDragon2580
-## Version: 1.7
+## Version: 1.8
 ## SavedVariables: FastNotificationRemoveDB
 ## IconTexture: Interface\AddOns\FastNotificationRemove\Media\Texture\logo
 
