@@ -237,13 +237,13 @@ function FastNotificationRemove:RemoveSettingsNotifications()
 
     -- Hide the NEW marker on the ESC/Game Menu after Blizzard refreshes its buttons.
     -- Important: we do not change CurrentVersionHasNewUnseenSettings() data anymore.
-    if GameMenuFrameMixin and not self._hookedGameMenuMixin then
-        hooksecurefunc(GameMenuFrameMixin, "InitButtons", function(menu)
+    if GameMenuFrame and type(GameMenuFrame.InitButtons) == "function" and not self._hookedGameMenuFrame then
+        hooksecurefunc(GameMenuFrame, "InitButtons", function(menu)
             if FastNotificationRemove.db and FastNotificationRemove.db.profile.removeSettingsBadges and CanTouchVisualUI() then
                 HideVisualFrame(menu and menu.NewOptionsFrame)
             end
         end)
-        self._hookedGameMenuMixin = true
+        self._hookedGameMenuFrame = true
     end
 
     if GameMenuFrame then
@@ -263,6 +263,19 @@ function FastNotificationRemove:RemoveMicroMenuNotifications()
     if MainMenuMicroButton then
         HideVisualFrame(MainMenuMicroButton.Alert)
         HideVisualFrame(MainMenuMicroButton.NotificationOverlay)
+    end
+
+    if EJMicroButton then
+        HideVisualFrame(EJMicroButton.NotificationOverlay)
+
+        if type(EJMicroButton.UpdateNotificationIcon) == "function" and not self._hookedEJNotification then
+            hooksecurefunc(EJMicroButton, "UpdateNotificationIcon", function(button)
+                if FastNotificationRemove.db and FastNotificationRemove.db.profile.removeMicroMenuNotifications and CanTouchVisualUI() then
+                    HideVisualFrame(button.NotificationOverlay)
+                end
+            end)
+            self._hookedEJNotification = true
+        end
     end
 
     if type(UpdateMicroButtons) == "function" and not self._hookedUpdateMicroButtons then
@@ -362,6 +375,7 @@ end
 
 function FastNotificationRemove:OnEnable()
     self:RegisterEvent("PLAYER_LOGIN", "RefreshAll")
+    self:RegisterEvent("PLAYER_REGEN_ENABLED", "RefreshAll")
     self:RegisterEvent("PLAYER_ENTERING_WORLD", "RefreshAll")
     self:RegisterEvent("SETTINGS_LOADED", "RefreshAll")
     self:RegisterEvent("ADDON_LOADED", "OnAddonLoaded")
@@ -373,6 +387,10 @@ end
 function FastNotificationRemove:OnAddonLoaded(_, addonName)
     if addonName == "Blizzard_Settings" then
         self:CreateOptionsCanvas()
+    end
+
+    if addonName == "Blizzard_Settings" or addonName == "Blizzard_GameMenu" or addonName == "Blizzard_MicroMenu" then
         self:RefreshAll()
     end
 end
+
